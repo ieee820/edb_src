@@ -16,9 +16,11 @@
 #include "core.hpp"
 #include "command.hpp"
 #include "commandFactory.hpp"
+#include "pd.hpp"
 
 
 COMMAND_BEGIN
+COMMAND_ADD(COMMAND_INSERT,InsertCommand)
 COMMAND_ADD(COMMAND_CONNECT,ConnectCommand)
 COMMAND_ADD(COMMAND_QUIT, QuitCommand)
 COMMAND_ADD(COMMAND_HELP, HelpCommand)
@@ -202,6 +204,40 @@ int ICommand::sendOrder( ossSocket & sock, int opCode )
 }
 
 /******************************InsertCommand**********************************************/
+int InsertCommand::handleReply()
+{
+   /*MsgReply * msg = (MsgReply*)_recvBuf;
+   int returnCode = msg->returnCode;
+   int ret = getError(returnCode);
+   return ret;*/
+  return EDB_OK;
+}
+
+int InsertCommand::execute( ossSocket & sock, std::vector<std::string> & argVec )
+{
+   int rc = EDB_OK;
+   if( argVec.size() <1 )
+   {
+      return getError(EDB_INSERT_INVALID_ARGUMENT);
+   }
+   _jsonString = argVec[0];
+     if( !sock.isConnected() )
+   {
+      return getError(EDB_SOCK_NOT_CONNECT);
+   }
+
+   rc = sendOrder( sock, 0 );
+   PD_RC_CHECK ( rc, PDERROR, "Failed to send order, rc = %d", rc ) ;
+
+   rc = recvReply( sock );
+   PD_RC_CHECK ( rc, PDERROR, "Failed to receive reply, rc = %d", rc ) ;
+   rc = handleReply();
+   PD_RC_CHECK ( rc, PDERROR, "Failed to receive reply, rc = %d", rc ) ;
+done :
+   return rc;
+error :
+   goto done ;
+}
 
 /******************************QueryCommand**********************************************/
 
@@ -232,7 +268,7 @@ int ConnectCommand::execute( ossSocket & sock, std::vector<std::string> & argVec
 int QuitCommand::handleReply()
 {
    int ret = EDB_OK;
-   //gQuit = 1;
+   gQuit = 1;
    return ret;
 }
 
@@ -244,7 +280,7 @@ int QuitCommand::execute( ossSocket & sock, std::vector<std::string> & argVec )
       return getError(EDB_SOCK_NOT_CONNECT);
    }
    ret = sendOrder( sock, 0 );
-   //sock.close();
+   sock.close();
    ret = handleReply();
    return ret;
 }
